@@ -13,7 +13,7 @@
 
 #define GDB_CPU_X86_64_NUM_AVX_REGISTERS 73
 /* Register sizes in bytes for x86_64 architecture including AVX */
-static const int x86_64_reg_size[GDB_CPU_X86_64_NUM_AVX_REGISTERS] = {
+static const size_t x86_64_reg_size[GDB_CPU_X86_64_NUM_AVX_REGISTERS] = {
     8,   /* GDB_CPU_X86_64_REG_RAX     = 0  - 64-bit general purpose */
     8,   /* GDB_CPU_X86_64_REG_RBX     = 1  - 64-bit general purpose */
     8,   /* GDB_CPU_X86_64_REG_RCX     = 2  - 64-bit general purpose */
@@ -134,7 +134,7 @@ typedef struct {
     int smp;
     int reg_num;
     size_t reg_byte;
-    size_t* regs_byte;
+    const size_t* regs_byte;
 } arch_info_t;
 
 typedef struct {
