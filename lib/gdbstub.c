@@ -99,18 +99,30 @@ bool gdbstub_init(gdbstub_t *gdbstub,
 static void process_reg_read(gdbstub_t *gdbstub, void *args)
 {
     char packet_str[MAX_SEND_PACKET_SIZE];
-    size_t reg_value;
-    size_t reg_sz = gdbstub->arch.reg_byte;
+    void* reg_value;
 
-    assert(sizeof(reg_value) >= gdbstub->arch.reg_byte);
+
+    //assert(sizeof(reg_value) >= gdbstub->arch.reg_byte);
 
     for (int i = 0; i < gdbstub->arch.reg_num; i++) {
-        int ret = gdbstub->ops->read_reg(args, i, &reg_value);
+        size_t reg_sz;
+        // if is valid (no regs_byte array)
+        if (gdbstub->arch.reg_byte != 0) {
+            reg_sz = gdbstub->arch.reg_byte;
+        } else {
+            reg_sz = gdbstub->arch.regs_byte[i];
+        }
+
+        reg_value = malloc(reg_sz);
+
+        int ret = gdbstub->ops->read_reg(args, i, reg_value);
         if (!ret) {
             hex_to_str((uint8_t *) &reg_value, &packet_str[i * reg_sz * 2],
                        reg_sz);
+            free(reg_value);
         } else {
             sprintf(packet_str, "E%d", ret);
+            free(reg_value);
             break;
         }
     }
@@ -121,11 +133,19 @@ static void process_reg_read_one(gdbstub_t *gdbstub, char *payload, void *args)
 {
     char packet_str[MAX_SEND_PACKET_SIZE];
     int regno;
-    size_t reg_sz = gdbstub->arch.reg_byte;
-    size_t reg_value;
-
     assert(sscanf(payload, "%x", &regno) == 1);
-    int ret = gdbstub->ops->read_reg(args, regno, &reg_value);
+
+    size_t reg_sz;
+    // if is valid (no regs_byte array)
+    if (gdbstub->arch.reg_byte != 0) {
+        reg_sz = gdbstub->arch.reg_byte;
+    } else {
+        reg_sz = gdbstub->arch.regs_byte[regno];
+    }
+
+    void* reg_value = malloc(reg_sz);
+
+    int ret = gdbstub->ops->read_reg(args, regno, reg_value);
 #ifdef DEBUG
     printf("reg read = regno %d data %lx\n", regno, reg_value);
 #endif
@@ -135,17 +155,28 @@ static void process_reg_read_one(gdbstub_t *gdbstub, char *payload, void *args)
         sprintf(packet_str, "E%d", ret);
     }
     conn_send_pktstr(&gdbstub->priv->conn, packet_str);
+
+    free(reg_value);
 }
 
 static void process_reg_write(gdbstub_t *gdbstub, char *payload, void *args)
 {
-    size_t reg_value = 0;
-    size_t reg_sz = gdbstub->arch.reg_byte;
 
-    assert(sizeof(reg_value) >= gdbstub->arch.reg_byte);
+    //assert(sizeof(reg_value) >= gdbstub->arch.reg_byte);
 
     for (int i = 0; i < gdbstub->arch.reg_num; i++) {
-        str_to_hex(&payload[i * reg_sz * 2], (uint8_t *) &reg_value, reg_sz);
+
+        size_t reg_sz;
+        // if is valid (no regs_byte array)
+        if (gdbstub->arch.reg_byte != 0) {
+            reg_sz = gdbstub->arch.reg_byte;
+        } else {
+            reg_sz = gdbstub->arch.regs_byte[i];
+        }
+
+        void* reg_value = malloc(reg_sz);
+
+        str_to_hex(&payload[i * reg_sz * 2], (uint8_t *)reg_value, reg_sz);
 #ifdef DEBUG
         printf("reg write = regno %d data %lx\n", i, reg_value);
 #endif
@@ -157,8 +188,11 @@ static void process_reg_write(gdbstub_t *gdbstub, char *payload, void *args)
             char packet_str[MAX_SEND_PACKET_SIZE];
             sprintf(packet_str, "E%d", ret);
             conn_send_pktstr(&gdbstub->priv->conn, packet_str);
+
+            free(reg_value);
             return;
         }
+        free(reg_value);
     }
     conn_send_pktstr(&gdbstub->priv->conn, "OK");
 }
@@ -166,7 +200,6 @@ static void process_reg_write(gdbstub_t *gdbstub, char *payload, void *args)
 static void process_reg_write_one(gdbstub_t *gdbstub, char *payload, void *args)
 {
     int regno;
-    size_t data;
     char *regno_str = payload;
     char *data_str = strchr(payload, '=');
     if (data_str) {
@@ -174,14 +207,26 @@ static void process_reg_write_one(gdbstub_t *gdbstub, char *payload, void *args)
         data_str++;
     }
 
-    assert(strlen(data_str) == gdbstub->arch.reg_byte * 2);
-    assert(sizeof(data) >= gdbstub->arch.reg_byte);
     assert(sscanf(regno_str, "%x", &regno) == 1);
-    str_to_hex(data_str, (uint8_t *) &data, gdbstub->arch.reg_byte);
+
+    size_t reg_sz;
+    // if is valid (no regs_byte array)
+    if (gdbstub->arch.reg_byte != 0) {
+        reg_sz = gdbstub->arch.reg_byte;
+    } else {
+        reg_sz = gdbstub->arch.regs_byte[regno];
+    }
+
+    void* reg_value = malloc(reg_sz);
+
+    assert(strlen(data_str) == reg_sz * 2);
+    assert(sizeof(reg_value) >= reg_sz);
+    
+    str_to_hex(data_str, (uint8_t *) reg_value, reg_sz);
 #ifdef DEBUG
     printf("reg write = regno %d / data %lx\n", regno, data);
 #endif
-    int ret = gdbstub->ops->write_reg(args, regno, data);
+    int ret = gdbstub->ops->write_reg(args, regno, reg_value);
     if (!ret) {
         conn_send_pktstr(&gdbstub->priv->conn, "OK");
     } else {
@@ -189,6 +234,7 @@ static void process_reg_write_one(gdbstub_t *gdbstub, char *payload, void *args)
         sprintf(packet_str, "E%d", ret);
         conn_send_pktstr(&gdbstub->priv->conn, packet_str);
     }
+    free(reg_value);
 }
 
 static void process_mem_read(gdbstub_t *gdbstub, char *payload, void *args)
