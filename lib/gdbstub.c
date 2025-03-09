@@ -117,7 +117,7 @@ static void process_reg_read(gdbstub_t *gdbstub, void *args)
 
         int ret = gdbstub->ops->read_reg(args, i, reg_value);
         if (!ret) {
-            hex_to_str((uint8_t *) &reg_value, &packet_str[i * reg_sz * 2],
+            hex_to_str((uint8_t *)reg_value, &packet_str[i * reg_sz * 2],
                        reg_sz);
             free(reg_value);
         } else {
@@ -150,7 +150,7 @@ static void process_reg_read_one(gdbstub_t *gdbstub, char *payload, void *args)
     printf("reg read = regno %d data %lx\n", regno, reg_value);
 #endif
     if (!ret) {
-        hex_to_str((uint8_t *) &reg_value, packet_str, reg_sz);
+        hex_to_str((uint8_t *)reg_value, packet_str, reg_sz);
     } else {
         sprintf(packet_str, "E%d", ret);
     }
