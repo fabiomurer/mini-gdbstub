@@ -108,9 +108,6 @@ static void process_reg_read(gdbstub_t *gdbstub, void *args)
     char packet_str[MAX_SEND_PACKET_SIZE];
     void* reg_value;
 
-
-    //assert(sizeof(reg_value) >= gdbstub->arch.reg_byte);
-
     for (int i = 0; i < gdbstub->arch.reg_num; i++) {
         size_t reg_sz;
         // if is valid (no regs_byte array)

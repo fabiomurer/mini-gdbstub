@@ -43,8 +43,8 @@ Method         | Description
 struct target_ops {
     gdb_action_t (*cont)(void *args);
     gdb_action_t (*stepi)(void *args);
-    int (*read_reg)(void *args, int regno, size_t *value);
-    int (*write_reg)(void *args, int regno, size_t value);
+    int (*read_reg)(void *args, int regno, void* value);
+    int (*write_reg)(void *args, int regno, void* value);
     int (*read_mem)(void *args, size_t addr, size_t len, void *val);
     int (*write_mem)(void *args, size_t addr, size_t len, void *val);
     bool (*set_bp)(void *args, size_t addr, bp_type_t type);
@@ -81,15 +81,20 @@ typedef enum {
 Another structure you have to declare is `arch_info_t`. You must explicitly specify about the
 following field within `arch_info_t` while integrating into your emulator:
 * `smp`: Number of target's CPU
-* `reg_byte`: Register's size in bytes
+* `reg_byte`: Register's size in bytes, use this field if all registers have the same size
+* `regs_bytes`: Register's size in bytes array, to use this field `reg_byte` must be set to `0`.
+    Use this field if there are some registers with different size. the array structure is defined 
+    as follow: `regs_bytes[i]` contains the size in bytes of the register `i`, an example for the `X86_64` 
+    architecture is supplied: `static const size_t x86_64_regs_size[]`
 * `reg_num`: Number of target's registers
 
 The `target_desc` is an optional member which could be
 `TARGET_RV32` or `TARGET_RV64` if the emulator is RISC-V 32-bit or 64-bit instruction
-set architecture. Alternatively, it can be a custom target description document
+set architecture or `TARGET_X86_64` if the emulator is x86-64 instruction
+set architecture, it can be a custom target description document
 string used by gdb. If none of these apply, simply set it to NULL.
 
-* Although the value of `reg_num` and `reg_byte` may be determined by `target_desc`, those
+* Although the value of `reg_num`,  `reg_byte` and `regs_byte` may be determined by `target_desc`, those
 members are still required to be filled correctly.
 
 ```cpp
