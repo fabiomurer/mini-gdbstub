@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "conn.h"
 #include "gdb_signal.h"
 #include "utils/csum.h"
@@ -43,6 +44,12 @@ static void *socket_reader(gdbstub_t *gdbstub)
         if (async_io_is_enable(gdbstub->priv) &&
             conn_try_recv_intr(&gdbstub->priv->conn)) {
             gdbstub->ops->on_interrupt(args);
+        } else {
+            /*
+            * sleep 1/4 of a second if async_io_is_enable() is false, 
+            * the thread doesn't waste CPU cycles TEMPORARY FIX
+            */
+            usleep(250000);
         }
     }
 
